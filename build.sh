@@ -32,8 +32,9 @@ done
 "$OBJCOPY" -O binary -j .pcmds build/cm4.elf build/pcmds.bin
 "$CC" $M7_FLAGS -Os -c -o build/gr7_main.o src/gr_m7.c
 "$CC" $M7_FLAGS -O2 -fno-tree-loop-distribute-patterns -c -o build/gr7_fast.o src/tape_fast_m7.c
+"$CC" $M7_FLAGS -O2 -fno-tree-loop-distribute-patterns -c -o build/gr7_dyn.o src/dyn_fast_m7.c
 "$CC" $M7_FLAGS -Wl,--build-id=none,-e,0 -T src/gr7.ld \
-  -o build/gr7.elf build/gr7_main.o build/gr7_fast.o
+  -o build/gr7.elf build/gr7_main.o build/gr7_fast.o build/gr7_dyn.o
 "$OBJCOPY" -O binary -j .cave build/gr7.elf build/gr7.bin
 "$NM" build/gr7.elf > build/gr7.symbols
 "$CC" $M7_FLAGS -Os -c -o build/delay7_main.o src/delay_m7.c
@@ -57,5 +58,5 @@ done
 "$CC" -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mthumb -mfloat-abi=hard -Os   -ffreestanding -nostdlib -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables   -Wall -Wextra -Werror -Wl,--build-id=none,-e,0   -Wl,--defsym=pc_present=0x$(awk '$3=="pc_present"{print $1}' build/pcm4.symbols)   -Wl,--defsym=gate_ui_tick=0x$(awk '$3=="gate_ui_tick"{print $1}' build/cm4.symbols)   -T src/cue4.ld -o build/cue4.elf src/cue_m4.c
 "$OBJCOPY" -O binary -j .cave build/cue4.elf build/cue4.bin
 "$NM" build/cue4.elf > build/cue4.symbols
-rm -f build/gr7_main.o build/gr7_fast.o build/delay7_main.o build/delay7_fast.o
+rm -f build/gr7_main.o build/gr7_fast.o build/gr7_dyn.o build/delay7_main.o build/delay7_fast.o
 python3 tools/make_release.py "$@"

@@ -2,6 +2,7 @@
 #include "shared.h"
 #include "granular.h"
 #include "shoegaze.h"
+#include "master_dyn_link.h"
 /* Granular/Shoegaze hot loops, compiled separately at -O2 (dsp_fast_m7.c).
  * Native delay wrappers and everything else in this unit stay at -Os. */
 void g_render_o2(struct granular *g,const float *in_l,const float *in_r,float *out_l,float *out_r,unsigned n);
@@ -422,6 +423,23 @@ unsigned delay_reverb_process(uint8_t *obj,void *ctx) {
 
 /* Native graph creates the single delay before audio starts. Reset volatile FX
  * state there so backup SRAM cannot replay a stale send on a later boot. */
+/* Master dynamics state (gr_m7.c): the last request, so every earlier buffer
+ * keeps the address it had before. The allocator serves this size from DTCM
+ * or the heap and falls back to the arena, where a request past the limit
+ * asserts: so, as for the buffers above, only ask while the arena has room. */
+static void md_allocate(void) {
+    MD_LINK->magic=0;MD_LINK->state=0;
+    uint32_t cursor=*(volatile uint32_t *)0x24000004u;
+    uint32_t limit=*(volatile uint32_t *)0x24000000u;
+    if(cursor>=MD_ARENA_LO && cursor<=limit && MD_TOTAL<=limit-cursor &&
+       cursor<=MD_ARENA_HI-MD_TOTAL) {
+        struct master_dyn *d=((void *(*)(unsigned))0x080412a5u)(MD_TOTAL);
+        if(!md_ram_ok((uint32_t)d,MD_TOTAL))return;
+        d->magic=0;
+        ((struct pk_hold *)((uint8_t *)d+MD_ALLOC))->magic=0;
+        MD_LINK->state=d;MD_LINK->magic=MD_LINK_MAGIC;
+    }
+}
 unsigned dly_construct(uint8_t *obj) {
     unsigned result=((unsigned (*)(uint8_t *))0x08052479u)(obj);
     backup_enable();PWR_CR1|=1u<<8;
@@ -441,5 +459,6 @@ unsigned dly_construct(uint8_t *obj) {
     x_reset(XS,obj);
     rc_reset(RC,obj);
     sg_allocate();
+    md_allocate();
     return result;
 }

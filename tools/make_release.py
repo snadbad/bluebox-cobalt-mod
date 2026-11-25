@@ -47,7 +47,16 @@ for slot in (4,32):
 PC={f[2]:int(f[0],16) for line in (ROOT/'build'/'pcm4.symbols').read_text().splitlines() if len(f:=line.split())==3}
 add('parameter definitions final call',0x08135fec,branch(0x08135fec,0x08134c8c),branch(0x08135fec,PC['pc_defs_hook']))
 add('master defaults final add',0x08120848,branch(0x08120848,0x0812028e),branch(0x08120848,symbols(4)['sat_default']))
-add('master settings saturation row',0x0814aea2,bytes(8),struct.pack('<4H',0x43,0x1b6,0x1b7,0x1b8))
+# Master dynamics rows follow the saturation rows; the list stays zero-terminated
+# inside its 68-entry table (37 used). Parameter ids: src/master_dyn_params.h.
+add('master settings saturation and dynamics rows',0x0814aea2,bytes(24),struct.pack('<12H',0x43,0x1b6,0x1b7,0x1b8,*range(0x1c0,0x1c8)))
+add('master parameter set capacity 68 to 80',0x081202c0,branch(0x081202c0,0x08120202),branch(0x081202c0,symbols(4)['md_set_capacity']))
+# On the device the sets already exist when 0x081202b8 fills them: the session constructor
+# (0x08126cbc) and the two project-copy constructors (0x0811e1xx, 0x0811e2xx) allocate the
+# master and bus sets (+0xe78..+0xee7, seven of them) with movs rN,#0x44 first, and the fill
+# reuses that allocation. Those three constants are what really decides the capacity.
+for at,old,new in ((0x08126cf6,'4425','5025'),(0x0811e186,'4424','5024'),(0x0811e290,'4424','5024')):
+ add('master and bus parameter sets allocated for 80 '+hex(at),at,bytes.fromhex(old),bytes.fromhex(new))
 # Extended delay: independently mapped desktop 1.5.2 locations.
 dcode=(ROOT/'build'/'delay7.bin').read_bytes()
 if len(dcode)>0x8000:raise ValueError('delay code cave too large')
@@ -104,6 +113,8 @@ add('channel EQ gate process pointer',0x0806a2b4,struct.pack('<I',0x08043b91),st
 # scale (restores the v0.9.7 publication overrides, with the scale mapping).
 for at,old,new in [(0x0804f8be,0x0804bab0,'gate_meter_mono_shim'),(0x0804f9c6,0x0804bacc,'gate_meter_stereo_shim'),(0x0804f9e0,0x0804bacc,'gate_meter_stereo_shim')]:
  add('Gate input meter '+hex(at),at,branch(at,old),branch(at,ngs[new]))
+# Peak readout: the output node's master meter call also feeds the held peak (peak_shared.h).
+add('master meter peak capture',0x0804e334,branch(0x0804e334,0x0804bacc),branch(0x0804e334,ngs['pk_master']))
 for at in [0x0804304a,0x08050c96,0x08051062]:
  add('gate EQ owner constructor '+hex(at),at,branch(at,0x08042e60),branch(at,ngs['gate_construct']))
 add('TRACK Gate fine encoder',0x08133248,branch(0x08133248,0x08127d50),branch(0x08133248,symbols(4)['gate_turn']))

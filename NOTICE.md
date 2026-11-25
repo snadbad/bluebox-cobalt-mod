@@ -31,3 +31,15 @@ Cobalt's own work includes the compressor gain-reduction meters, the FX1
 delay modes (Delay, Granular, Tape, Ducked, Reverse), the FX2 Gazer reverb,
 the per-track noise gate, tape-style master saturation, the overdub recording
 fix, the theme editor and the browser and Python patchers.
+
+## Master dynamics (fork)
+
+The master clipper, the Glue / Punch / Opto / Squash compressor models and the
+master limiter in `src/master_dyn.h` are ported from **JOEBOX / blackbox-mod**
+by Justin Joe: https://github.com/j3threejay/blackbox-mod (`src/clip.c`,
+`src/compm.c`, reviewed at the commit in `tests/references/joebox/COMMIT`),
+with the author's permission and under its MIT licence. Copyright (c) 2026
+Justin Joe. The licence text is in `src/master_dyn.h` and in
+`tests/references/joebox/LICENSE`, next to the unmodified `clip.c` the host
+test compares against. Every bluebox address, hook and parameter slot used by
+the port was traced on the desktop 1.5.2 firmware independently.

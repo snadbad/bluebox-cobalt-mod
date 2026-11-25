@@ -1,5 +1,13 @@
 # Cobalt for 1010music bluebox desktop
 
+> **This is a personal fork of [Cobalt](https://github.com/sbsmnt/bluebox-cobalt-mod) 1.2.0**
+> that adds master dynamics (clipper, compressor models, limiter), a peak
+> readout and a CPU readout: see [Master dynamics (this fork)](#master-dynamics-this-fork).
+> It is not made or supported by the Cobalt author or by 1010music. The patcher
+> links below point at the original Cobalt page, which does **not** include
+> these additions: to get them, use `patch_bluebox.html` or `patch_bluebox.py`
+> from this repository. Tried on one unit only.
+
 **v1.2.0 - for bluebox desktop firmware 1.5.2**
 
 Cobalt is an unofficial firmware mod for the bluebox desktop. It adds delay
@@ -13,6 +21,78 @@ here.
 
 > Cobalt is not made, endorsed or supported by 1010music. Keep a copy of your
 > working firmware and back up your projects before installing.
+
+## Master dynamics (this fork)
+
+This fork adds three stages to the master bus, ported from
+[JOEBOX / blackbox-mod](https://github.com/j3threejay/blackbox-mod) by Justin
+Joe with his permission (MIT, see [NOTICE](NOTICE.md)). TOOLS shows
+**Cblt+Dyn** in the middle field. Everything is off by default, and with it
+off the audio is bit-identical to Cobalt 1.2.0.
+
+MAIN → B, after the Sat Out row:
+
+| Row | What it does |
+|---|---|
+| Comp Model | **Stock** (the bluebox compressor, all its rows), **Glue** (2:1, soft knee, auto release), **Punch** (4:1, 30 ms attack lets the hit through), **Opto** (3:1, wide knee, slow two-stage release) or **Squash** (20:1, fast, blended 50/50 with dry). A model only runs while Compressor is on |
+| Clipper | **Off**, **Clean** (symmetric) or **Diode** (the top half rounds earlier: even harmonics) |
+| Clip | How hard the mix is pushed into the clipper, 0–100 % = 0 to +18 dB. At 0 it only catches what is already over |
+| Shape | 0 % soft (rounded from the bottom) to 100 % hard (flat top). Default 80 % |
+| Limiter | Off / On. Look-ahead limiter, 1.5 ms |
+| Drive | Gain into the limiter, 0 to +18 dB |
+| Ceiling | Where the limiter stops the signal, −12 to 0 dB. Default −0.3 dB |
+| Flow | The order: **Clip>Comp>Lim** (default), **Comp>Clip>Lim** or **Comp>Lim>Clip**. Saturation always follows the compressor |
+
+- **Models and the stock rows.** With a model picked, Thresh, Gain and Wet/Dry
+  still work: Thresh at its default −20 dB is the JOEBOX voicing of that model
+  and each dB moves its threshold by one (−24 to +12 dB around it). Attack,
+  Release, Ratio, Knee, Lookahead, AutoRel, AutoMkup and Mode belong to Stock
+  only. The gain-reduction meters show the model.
+- **Clipper.** The curve runs at 96 kHz so its harmonics do not fold back, and
+  only what it cuts off is added to the signal: below the knee the output is
+  the input. Its ceiling is fixed at −0.3 dBFS. It is 5 samples late.
+- **Limiter.** Nothing leaves above Ceiling. It is 72 samples (1.5 ms) late.
+- **Levels are the levels at this point of the master chain.** Whether the
+  Main fader or anything else comes after the compressor node has not been
+  traced; check on the outputs what Ceiling means on your unit.
+- **Cost.** Measured in the emulator per 32-sample block: the stock
+  compressor is about 5 800 instructions, a model about 5 400 (it replaces
+  stock), the limiter 4 800, the clipper 7 900; everything on is about
+  17 700, three stock compressors. Watch the CPU bar on a busy project.
+- **Scenes** do not store these rows. Projects do.
+- Projects saved with these rows open in Cobalt 1.2.0 and in stock (the rows
+  are ignored there).
+
+### Peak readout (this fork)
+
+Each track header, and the master's, shows the peak level of its meter as a
+number in the bottom-right corner: whole dB below full scale, so `-12` is
+−12 dB (on narrow headers the minus sign is left out). It is the same level
+the bar shows, the louder side of a stereo track, held for 1.5 s unless a
+higher peak replaces it. Nothing is shown below the meters' −60 dB floor. At
+0 dB or over the box turns red and reads `0`. In MIXER → Gate view the bar
+still shows the gate's detector; the number stays the channel level.
+Cost on the audio core: about 95 instructions per channel per block.
+
+### CPU load in per cent (this fork)
+
+On TOOLS, a small line along the bottom of the middle field (under
+`Cblt+Dyn`) reads average / recent peak of the audio engine, e.g. `42/61%`.
+These are the numbers behind the header bar; it turns amber once the peak is
+over 70 % and red over 90 %. Nothing is added on the audio core.
+A status digit follows the per cent sign: **3** = master dynamics ready,
+**7** = a clipper, model or limiter is working, **1** = only the meter
+readout is alive, **0** = the audio core has no state for either.
+
+Build as described under [Building from source](#building-from-source) (Arm GNU Toolchain 13.2.Rel1). Tests:
+`python3 tests/run_checks.py /path/to/BLUEBOX.BIN`; the new suites are
+`tests/test_peak_readout.py`, `tests/test_master_dyn.py` (the patched firmware in the emulator against the
+same C on the host and against Cobalt 1.2.0) and `tests/master_dyn_host.c`
+(the DSP with sanitizers, and the clipper sample for sample against JOEBOX's
+own `clip.c`). **Tried on one bluebox desktop only** (firmware 1.5.2): it boots,
+the rows edit, the stages act on the audio, the peak numbers and the TOOLS
+readout show. With clipper, a model and the limiter on, that unit's engine
+load went from about 50 % to about 64 %.
 
 ## New in v1.2
 

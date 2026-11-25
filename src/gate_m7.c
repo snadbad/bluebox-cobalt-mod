@@ -1,6 +1,7 @@
 #include "shared.h"
 #include "noise_gate.h"
 #include "gate_diag_m7.h"
+#include "master_dyn_link.h"
 #define NG_MAGIC 0x4e473937u
 struct gate_bank {uint32_t magic;struct noise_gate track[12];float input_peak[12][2];uint8_t *meter_ctx;};
 #define NG_BANK ((struct gate_bank *)0x38800400u)
@@ -80,7 +81,35 @@ static int gate_meter_active(uint8_t *mix,unsigned ch) {
     NG_BANK->meter_ctx=mix;
     return ch<12 && *(uint16_t *)(mix+0xe6c)==NG_ID;
 }
+/* Peak readout (peak_shared.h): every level the mixer publishes for a track,
+ * and the output node's for the master, goes through a 1.5 s hold and out to
+ * the M4 as one byte. The cache line is only cleaned when the byte changes. */
+static void pk_note(unsigned ch,float db) {
+    if(ch>=PK_CHANNELS)return;
+    backup_enable();PWR_CR1|=1u<<8;
+    uint32_t base=(uint32_t)md_block();
+    if(!base)return;
+    struct pk_hold *h=(struct pk_hold *)(base+MD_ALLOC);
+    if(h->magic!=PK_MAGIC || PK_REPORT->magic!=PK_MAGIC) {
+        for(unsigned i=0;i<PK_CHANNELS;i++){h->hold[i]=PK_NONE;h->age[i]=0;PK_REPORT->v[i]=PK_NONE;}
+        h->magic=PK_MAGIC;PK_REPORT->magic=PK_MAGIC;
+    }
+    pk_status(PK_ST_BLOCK,0);
+    int v=pk_step(h,ch,pk_code(db));
+    if(PK_REPORT->v[ch]!=v) {
+        PK_REPORT->v[ch]=(int8_t)v;
+        __asm volatile("dsb" ::: "memory");
+        SCB_DCCMVAC=(uint32_t)PK_REPORT;
+        __asm volatile("dsb\nisb" ::: "memory");
+    }
+}
+/* Replaces the output node's master meter call (bl 0x0804bacc at 0x0804e334, channel 12). */
+void pk_master(void *report,unsigned ch,float l,float r) {
+    pk_note(ch,l>r?l:r);
+    ((void (*)(void *,unsigned,float,float))0x0804bacdu)(report,ch,l,r);
+}
 void gate_meter_mono(void *report,unsigned ch,uint8_t *mix,float db) {
+    pk_note(ch,db);
     if(gate_meter_active(mix,ch)) {
         float p=NG_BANK->input_peak[ch][0];if(NG_BANK->input_peak[ch][1]>p)p=NG_BANK->input_peak[ch][1];
         db=gate_meter_db(p);
@@ -88,6 +117,7 @@ void gate_meter_mono(void *report,unsigned ch,uint8_t *mix,float db) {
     ((void (*)(void *,unsigned,float))0x0804bab1u)(report,ch,db);
 }
 void gate_meter_stereo(void *report,unsigned ch,uint8_t *mix,float l,float r) {
+    pk_note(ch,l>r?l:r);
     if(gate_meter_active(mix,ch)) {
         l=gate_meter_db(NG_BANK->input_peak[ch][0]);
         r=gate_meter_db(NG_BANK->input_peak[ch][1]);

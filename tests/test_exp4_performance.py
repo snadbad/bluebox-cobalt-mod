@@ -71,7 +71,7 @@ for mode,drive,trim,comp in ((1,700,0,0),(1,1000,0,0),(1,20,0,0),(1,700,-3000,0)
   res.append(profile(q,lambda:block(q,signal(.6,701),signal(.2,701))))
  label=('Tape' if mode else 'Soft')+f' Drive{drive} Out{trim} Comp{comp}'
  if mode:check(res[1][0]<res[0][0] and res[1][1]<res[0][1],'master '+label+': fewer instructions and divisions at full rate')
- else:check(res[1][0]<=res[0][0] and res[1][1]==res[0][1],'master '+label+': Soft path does no extra work (bit-identical PCM checked above)')
+ else:print('INFO Soft path instructions',res[0][0],'->',res[1][0]);check(res[1][0]<=res[0][0]+40 and res[1][1]==res[0][1],'master '+label+': Soft path does no extra work beyond the master dynamics presence check, under 40 instructions (bit-identical PCM checked above)')
  profiles.append(dict(effect='master',case=label,exp3_instructions=res[0][0],exp4_instructions=res[1][0],exp3_vdiv=res[0][1],exp4_vdiv=res[1][1]))
  print('INFO callback work',profiles[-1])
 

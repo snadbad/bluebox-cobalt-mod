@@ -1,5 +1,28 @@
 # Changelog
 
+## Master dynamics (fork of 1.2.0, tried on one unit)
+
+- Master clipper (Clean / Diode, Clip, Shape), compressor models (Glue, Punch,
+  Opto, Squash next to Stock) and a look-ahead limiter (Drive, Ceiling) on the
+  master bus, ported from JOEBOX by Justin Joe (MIT).
+- Flow: Clip>Comp>Lim, Comp>Clip>Lim or Comp>Lim>Clip.
+- Eight rows on MAIN → B after Sat Out, saved with the project (parameter ids
+  0x1c0..0x1c7). The master and bus parameter sets are allocated for 80
+  entries (0x08126cf6, 0x0811e186, 0x0811e290): Cobalt 1.2.0 filled the
+  master's 68 exactly. The first hardware build missed these three constants
+  and its new rows could not be changed.
+- With every stage off, audio and compressor state are bit-identical to 1.2.0.
+- Peak readout: held peak level in dB on every track header and the master
+  (published at backup SRAM 0x38800648, hold in the arena behind the dynamics
+  state, master meter call 0x0804e334, drawn by the cue icon overlay).
+- TOOLS shows `Cblt+Dyn`, and under it the audio engine load as average / peak per cent.
+- The state block (about 1 KB) is requested last in the delay constructor.
+  The native allocator serves that size from DTCM, not the SDRAM arena; the
+  first hardware builds refused a non-arena address, so the stages and the
+  peak readout never ran on the device.
+- Addresses: M7 code in the existing compressor gap (0x080a0000), link at backup
+  SRAM 0x38800f90, row list 0x0814aeaa..0x0814aeb9, call site 0x081202c0.
+
 ## v1.2.0
 
 Phones AUTO cue, for bluebox desktop firmware 1.5.2. Contributed by

@@ -15,7 +15,7 @@ def definitions(image):
 a,old=definitions(stock);b,new=definitions(patched)
 lo=0x43*28;hi=lo+28
 check(old[lo:hi]==bytes(28),'native desktop definition slot 0x43 is unused in stock')
-check(all(old[i*28:(i+1)*28]==new[i*28:(i+1)*28] for i in range(523) if i not in [0x43,0x3a,0x3d,0x4a,0x4b,0x155,*range(0x1a0,0x1ba),0x178]),'native parameter definitions outside the declared extensions (incl. exp.8 Tape Lo C 0x1b9, Phones Src AUTO 0x178) are preserved')
+check(all(old[i*28:(i+1)*28]==new[i*28:(i+1)*28] for i in range(523) if i not in [0x43,0x3a,0x3d,0x4a,0x4b,0x155,*range(0x1a0,0x1ba),0x178,*range(0x1c0,0x1c8)]),'native parameter definitions outside the declared extensions (incl. exp.8 Tape Lo C 0x1b9, Phones Src AUTO 0x178, master dynamics 0x1c0..0x1c7) are preserved')
 id,kind=struct.unpack('<HB',new[lo:lo+3]);label=u32(b,0xc0010000+lo+4);key=u32(b,0xc0010000+lo+24)
 def string(u,p):return bytes(u.mem_read(p,64)).split(b'\0')[0]
 check(id==0x43 and kind==8 and string(b,label)==b'Saturate:','native knob definition has expected id/type/label')
@@ -28,14 +28,14 @@ def parameters(image,kind):
  return u,[struct.unpack('<H2xi',u.mem_read(0xc0010000+8*i,8)) for i in range(n)],cap
 for kind in range(1,9):
  a,old,cap=parameters(stock,kind);b,new,cap=parameters(patched,kind)
- expected=([(0x33,400),(0x39,400),(0xe,120),(0xcb,1000),(0x4a,0),(0x3a,0),(0x3d,0),(0xca,1),(0x35,1),(0x36,1),(0x4b,0),(0x37,0),(0x34,6),(0x1a0,5),(0x1a1,250),(0x1a2,80),(0x1a3,4),(0x1a4,0),(0x1a5,0),(0x1a6,0),(0x1a7,350),(0x1a8,700),(0x1a9,300),(0x1aa,400),(0x1ab,650),(0x1ac,6000),(0x1ad,0),(0x1b9,20)] if kind==4 else old+([(0x43,0),(0x1b6,0),(0x1b7,500),(0x1b8,0)] if kind==2 else [(0x1ae,-96000)] if kind==1 else list(zip(range(0x1af,0x1b6),[350,600,750,250,200,5500,120])) if kind==5 else []))
+ expected=([(0x33,400),(0x39,400),(0xe,120),(0xcb,1000),(0x4a,0),(0x3a,0),(0x3d,0),(0xca,1),(0x35,1),(0x36,1),(0x4b,0),(0x37,0),(0x34,6),(0x1a0,5),(0x1a1,250),(0x1a2,80),(0x1a3,4),(0x1a4,0),(0x1a5,0),(0x1a6,0),(0x1a7,350),(0x1a8,700),(0x1a9,300),(0x1aa,400),(0x1ab,650),(0x1ac,6000),(0x1ad,0),(0x1b9,20)] if kind==4 else old+([(0x43,0),(0x1b6,0),(0x1b7,500),(0x1b8,0),(0x1c0,0),(0x1c1,0),(0x1c2,0),(0x1c3,800),(0x1c4,0),(0x1c5,0),(0x1c6,-300),(0x1c7,0)] if kind==2 else [(0x1ae,-96000)] if kind==1 else list(zip(range(0x1af,0x1b6),[350,600,750,250,200,5500,120])) if kind==5 else []))
  check(new==expected,'native set kind '+str(kind)+': correct master/delay defaults and preserved other kinds')
  check(len(new)<=cap,'native set kind '+str(kind)+': entries stay within allocated capacity')
  if kind==2:
   call(b,0x8120264,0x24020000,0x43,730)
   check(call(b,0x8120234,0x24020000,0x43)==730,'actual native parameter set/get stores saturation changes')
-ids=list(struct.unpack('<6H',patched[0x10aea0:0x10aeac]))
-check(ids==[0x13b,0x43,0x1b6,0x1b7,0x1b8,0],'master menu appends saturation after last compressor row and retains terminator')
+ids=list(struct.unpack('<14H',patched[0x10aea0:0x10aebc]))
+check(ids==[0x13b,0x43,0x1b6,0x1b7,0x1b8,*range(0x1c0,0x1c8),0],'master menu appends saturation, then master dynamics, after last compressor row and retains terminator')
 
 # Execute native parameter save/load loops. Only the XML object/storage
 # boundary is stubbed; enumeration, key lookup and set updates execute stock.
